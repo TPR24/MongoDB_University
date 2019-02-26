@@ -1,5 +1,6 @@
 package mflix.api.daos;
 
+import com.mongodb.client.AggregateIterable;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.model.*;
@@ -11,8 +12,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
+
+import static com.mongodb.client.model.Filters.eq;
 
 @Component
 public class MovieDao extends AbstractMFlixDao {
@@ -26,12 +30,6 @@ public class MovieDao extends AbstractMFlixDao {
             MongoClient mongoClient, @Value("${spring.mongodb.database}") String databaseName) {
         super(mongoClient, databaseName);
         moviesCollection = db.getCollection(MOVIES_COLLECTION);
-    }
-
-    @SuppressWarnings("unchecked")
-    private Bson buildLookupStage() {
-        return null;
-
     }
 
     /**
@@ -60,12 +58,23 @@ public class MovieDao extends AbstractMFlixDao {
             return null;
         }
 
-        List<Bson> pipeline = new ArrayList<>();
-        // match stage to find movie
-        Bson match = Aggregates.match(Filters.eq("_id", new ObjectId(movieId)));
-        pipeline.add(match);
-        Document movie = moviesCollection.aggregate(pipeline).first();
+        // TODO - Change this to use builders at some point.
+        // This rather ugly approach used as Compass will not support builders for lookups with the 'let' syntax.
+        List<Document> pipeline = Arrays.asList(new Document("$match",
+                        new Document("_id",
+                                new ObjectId(movieId))),
+                new Document("$lookup",
+                        new Document("from", "comments")
+                                .append("let",
+                                        new Document("id", "$_id"))
+                                .append("pipeline", Arrays.asList(new Document("$match",
+                                                new Document("$expr",
+                                                        new Document("$eq", Arrays.asList("$movie_id", "$$id")))),
+                                        new Document("$sort",
+                                                new Document("date", -1L))))
+                                .append("as", "comments")));
 
+        Document movie = moviesCollection.aggregate(pipeline).first();
         return movie;
     }
 
@@ -82,6 +91,7 @@ public class MovieDao extends AbstractMFlixDao {
         String defaultSortKey = "tomatoes.viewer.numReviews";
         List<Document> movies =
                 new ArrayList<>(getMovies(limit, skip, Sorts.descending(defaultSortKey)));
+
         return movies;
     }
 
@@ -194,7 +204,6 @@ public class MovieDao extends AbstractMFlixDao {
         // sort key
         Bson sort = Sorts.descending(sortKey);
         List<Document> movies = new ArrayList<>();
-
 
 
         moviesCollection.find(genreFilter).sort(sort).skip(skip).limit(limit).iterator()

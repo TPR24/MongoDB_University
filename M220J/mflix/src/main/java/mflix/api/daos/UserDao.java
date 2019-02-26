@@ -6,6 +6,8 @@ import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.UpdateOptions;
+import com.mongodb.client.result.UpdateResult;
 import mflix.api.models.Session;
 import mflix.api.models.User;
 import org.bson.Document;
@@ -22,6 +24,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import static com.mongodb.client.model.Filters.eq;
 import static org.bson.codecs.configuration.CodecRegistries.fromProviders;
 import static org.bson.codecs.configuration.CodecRegistries.fromRegistries;
 
@@ -176,11 +179,35 @@ public class UserDao extends AbstractMFlixDao {
      *                        ones. Cannot be set to null value
      * @return User object that just been updated.
      */
-    public boolean updateUserPreferences(String email, Map<String, ?> userPreferences) {
-        //TODO> Ticket: User Preferences - implement the method that allows for user preferences to
-        // be updated.
+    public boolean updateUserPreferences(String email, Map<String, String> userPreferences) {
         //TODO > Ticket: Handling Errors - make this method more robust by
         // handling potential exceptions when updating an entry.
-        return false;
+
+        // Simplistic error handling to check for nulls or empties, as more sophisticated error handling seems covered later.
+        if (email == null || email.isEmpty()) {
+            System.out.println("updateUserPreferences called with invalid email address.");
+            return false;
+        } else if (userPreferences == null) {
+            throw new IncorrectDaoOperation("Attempted to user preferences with a null value.");
+        }
+
+        // Retrieve the user in question
+        Bson queryFilter = new Document("email", email);
+        User userToUpdate = usersCollection.find(queryFilter).iterator().tryNext();
+
+        // Another simple error handler, placeholder until the Handling Errors ticket.
+        if(userToUpdate.isEmpty()) {
+            System.out.println("Attempted to update user preferences for an empty user, based upon email address: " +email);
+            return false;
+        }
+
+        userToUpdate.setPreferences(userPreferences);
+        UpdateResult updatePreferencesResult = usersCollection.replaceOne(eq("email", email), userToUpdate, new UpdateOptions().upsert(true));
+
+        if(updatePreferencesResult.wasAcknowledged()) {
+            return true;
+        } else {
+            return false;
+        }
     }
 }
