@@ -40,10 +40,8 @@ public class MovieDao extends AbstractMFlixDao {
      * @return true if valid movieId.
      */
     private boolean validIdValue(String movieId) {
-        //TODO> Ticket: Handling Errors - implement a way to catch a
-        //any potential exceptions thrown while validating a movie id.
-        //Check out this method's use in the method that follows.
-        return true;
+        // This implementation will already check for nulls etc, so no need to do anything more here.
+        return ObjectId.isValid(movieId);
     }
 
     /**
@@ -55,6 +53,7 @@ public class MovieDao extends AbstractMFlixDao {
     @SuppressWarnings("UnnecessaryLocalVariable")
     public Document getMovie(String movieId) {
         if (!validIdValue(movieId)) {
+            System.out.println("Movie ID for a getMovie request was not a valid object ID.");
             return null;
         }
 

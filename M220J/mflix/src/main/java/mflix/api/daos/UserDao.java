@@ -1,6 +1,7 @@
 package mflix.api.daos;
 
 import com.mongodb.MongoClientSettings;
+import com.mongodb.MongoWriteException;
 import com.mongodb.WriteConcern;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoCollection;
@@ -59,9 +60,17 @@ public class UserDao extends AbstractMFlixDao {
      * @return True if successful, throw IncorrectDaoOperation otherwise
      */
     public boolean addUser(User user) {
-        //TODO > Ticket: Handling Errors - make sure to only add new users
-        // and not users that already exist.
-        usersCollection.insertOne(user);
+        if (user == null) {
+            System.out.println("Attempted to add null user.");
+            return false;
+        }
+
+        try {
+            usersCollection.insertOne(user);
+        } catch (MongoWriteException exception) {
+            throw new IncorrectDaoOperation("Attempt to add new user failed: " + exception);
+        }
+
         return true;
     }
 
@@ -196,15 +205,15 @@ public class UserDao extends AbstractMFlixDao {
         User userToUpdate = usersCollection.find(queryFilter).iterator().tryNext();
 
         // Another simple error handler, placeholder until the Handling Errors ticket.
-        if(userToUpdate.isEmpty()) {
-            System.out.println("Attempted to update user preferences for an empty user, based upon email address: " +email);
+        if (userToUpdate.isEmpty()) {
+            System.out.println("Attempted to update user preferences for an empty user, based upon email address: " + email);
             return false;
         }
 
         userToUpdate.setPreferences(userPreferences);
         UpdateResult updatePreferencesResult = usersCollection.replaceOne(eq("email", email), userToUpdate, new UpdateOptions().upsert(true));
 
-        if(updatePreferencesResult.wasAcknowledged()) {
+        if (updatePreferencesResult.wasAcknowledged()) {
             return true;
         } else {
             return false;
